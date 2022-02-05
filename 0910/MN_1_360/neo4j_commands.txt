@@ -1,0 +1,13 @@
+WITH "https://raw.githubusercontent.com/rmparanhos/map-pluto-pipeline/main/0910/MN_1_360/nodes2009.csv" AS uri
+LOAD CSV WITH HEADERS FROM uri AS row
+MERGE (c:Lot2009 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})
+
+WITH "https://raw.githubusercontent.com/rmparanhos/map-pluto-pipeline/main/0910/MN_1_360/nodes2010.csv" AS uri
+LOAD CSV WITH HEADERS FROM uri AS row
+MERGE (c:Lot2010 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})
+
+WITH "https://raw.githubusercontent.com/rmparanhos/map-pluto-pipeline/main/0910/MN_1_360/edges.csv" AS uri
+LOAD CSV WITH HEADERS FROM uri AS row
+MATCH (source:Lot2009 {bbl: row.Source})
+MATCH (target:Lot2010 {bbl: row.Target})
+MERGE (source)-[:INTERSECTION {area: toFloat(row.Area),areaA: toFloat(row.AreaA),areaB: toFloat(row.AreaB)}]->(target)
