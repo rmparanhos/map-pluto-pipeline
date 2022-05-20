@@ -2,6 +2,7 @@ import os
 import time
 import shapefile
 from shapely.geometry import mapping, shape
+import shutil
 
 def relationship_maker_by_block_09_10(block_number, borough_name):
     tic = time.perf_counter()
@@ -268,55 +269,92 @@ def relationship_maker_by_block_range_n_m(n,m, initial_block_number, final_block
         os.mkdir("{}{}".format(n,m))
         os.mkdir("{}{}/{}_{}_{}".format(n,m,borough_name,initial_block_number,final_block_number))
     except FileExistsError as e:
-        os.rmdir("{}{}/{}_{}_{}".format(n,m,borough_name,initial_block_number,final_block_number))
-        print("Directory already exists, going on")
+        print("Directory already exists, deleting")
+        shutil.rmtree("{}{}/{}_{}_{}".format(n,m,borough_name,initial_block_number,final_block_number), ignore_errors=True)
+        os.mkdir("{}{}/{}_{}_{}".format(n,m,borough_name,initial_block_number,final_block_number))
     
     with (open("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,n), 'a') as nodes_n_csv, 
             open("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,m), 'a') as nodes_m_csv,
             open("{}{}/{}_{}_{}/edges.csv".format(n,m,borough_name,initial_block_number,final_block_number), 'a') as edges_csv,
             open("{}{}/{}_{}_{}/neo4j_commands.txt".format(n,m,borough_name,initial_block_number,final_block_number), 'a') as neo4j):
         
-        nodes_n_csv.write("BBL,BOROUGH,BLOCK,ADDRESS,YEAR\n")
-        nodes_m_csv.write("BBL,BOROUGH,BLOCK,ADDRESS,YEAR\n")
+        #nodes_n_csv.write("BBL,BOROUGH,BLOCK,ADDRESS,YEAR\n")
+        #nodes_m_csv.write("BBL,BOROUGH,BLOCK,ADDRESS,YEAR\n")
         edges_csv.write("Source,Target,Area,AreaA,AreaB\n")
-        neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes2010.csv\" AS uri\n")
-        neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
-        neo4j.write("""MERGE (c:Lot2010 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})\n\n""")
-        neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes2011.csv\" AS uri\n")
-        neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
-        neo4j.write("""MERGE (c:Lot2011 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})\n\n""")
-        neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/edges.csv\" AS uri\n")
-        neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
-        neo4j.write("""MATCH (source:Lot2010 {bbl: row.Source})\n""")
-        neo4j.write("""MATCH (target:Lot2011 {bbl: row.Target})\n""")
-        neo4j.write("""MERGE (source)-[:INTERSECTION {area: toFloat(row.Area),areaA: toFloat(row.AreaA),areaB: toFloat(row.AreaB)}]->(target)\n""")
-
+        #neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes2010.csv\" AS uri\n")
+        #neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+        #neo4j.write("""MERGE (c:Lot2010 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})\n\n""")
+        #neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes2011.csv\" AS uri\n")
+        #neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+        #neo4j.write("""MERGE (c:Lot2011 {bbl:row.BBL,borough:row.BOROUGH,block:row.BLOCK,address:row.ADDRESS,year:row.YEAR})\n\n""")
+        #neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/edges.csv\" AS uri\n")
+        #neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+        #neo4j.write("""MATCH (source:Lot2010 {bbl: row.Source})\n""")
+        #neo4j.write("""MATCH (target:Lot2011 {bbl: row.Target})\n""")
+        #neo4j.write("""MERGE (source)-[:INTERSECTION {area: toFloat(row.Area),areaA: toFloat(row.AreaA),areaB: toFloat(row.AreaB)}]->(target)\n""")
+    
+    nodes_records_n = []
+    nodes_records_m = []
+    nodes_shapes_n = []
+    nodes_shapes_m = []
+    index = 0
+            
     for block_number in range(initial_block_number,final_block_number+1):
-        tic = time.perf_counter()    
-        with (shapefile.Reader("MapPLUTO_{}v2/{}/{}MapPLUTO.shp".format(n,boroughs.get(borough_name),borough_name)) as shp_n, 
-            shapefile.Reader("MapPLUTO_{}v2/{}/{}MapPLUTO.shp".format(m,boroughs.get(borough_name),borough_name)) as shp_m, 
+        tic = time.perf_counter()
+        shp1 = "MapPLUTO_{}v2/{}/{}MapPLUTO.shp".format(n,boroughs.get(borough_name),borough_name)
+        shp2 = "MapPLUTO_{}v2/{}/{}MapPLUTO.shp".format(m,boroughs.get(borough_name),borough_name)    
+        if (n >= 18):
+            shp1 = "MapPLUTO_{}v2/MapPLUTO.shp".format(n,borough_name)
+        if (m >= 18):
+            shp2 = "MapPLUTO_{}v2/MapPLUTO.shp".format(m,borough_name)
+        with (shapefile.Reader(shp1) as shp_n, 
+            shapefile.Reader(shp2) as shp_m, 
                 open("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,n), 'a') as nodes_n_csv, 
                 open("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,m), 'a') as nodes_m_csv,
                 open("{}{}/{}_{}_{}/edges.csv".format(n,m,borough_name,initial_block_number,final_block_number), 'a') as edges_csv,
                 open("{}{}/{}_{}_{}/neo4j_commands.txt".format(n,m,borough_name,initial_block_number,final_block_number), 'a') as neo4j):
-            
-            nodes_records_n = []
-            nodes_records_m = []
-            nodes_shapes_n = []
-            nodes_shapes_m = []
-            index = 0
-            for record_row in shp_n.records():
-                if record_row['Block'] == block_number and record_row['Borough'] == borough_name:
-                    nodes_records_n.append(record_row)
-                    nodes_shapes_n.append(shp_n.shape(index))
-                index += 1    
-            index = 0
-            for record_row in shp_m.records():
-                if record_row['Block'] == block_number and record_row['Borough'] == borough_name:
-                    nodes_records_m.append(record_row)
-                    nodes_shapes_m.append(shp_m.shape(index))
-                index +=1
-            
+           
+            if(os.stat("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,n)).st_size == 0):
+                fields_n = ['YearBBL:row.YearBBL','Year:row.Year']
+                for field in [row[0] for row in shp_n.fields][1:]:
+                    fields_n.append("{}:row.{}".format(field,field))
+                
+                fields_m = ['YearBBL:row.YearBBL','Year:row.Year']
+                for field in [row[0] for row in shp_m.fields][1:]:
+                    fields_m.append("{}:row.{}".format(field,field))
+                
+                nodes_n_csv.write("YearBBL," + ','.join([row[0] for row in shp_n.fields][1:]) + ",Year\n")
+                neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes20{n}.csv\" AS uri\n")
+                neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+                neo4j.write("MERGE (c:Lot20{} {{{}}})\n\n".format(n,','.join(fields_n)))
+                neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/nodes20{m}.csv\" AS uri\n")
+                neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+                neo4j.write("MERGE (c:Lot20{} {{{}}})\n\n".format(m,','.join(fields_m)))
+                neo4j.write(f"WITH \"file:///{n}{m}/{borough_name}_{initial_block_number}_{final_block_number}/edges.csv\" AS uri\n")
+                neo4j.write("""LOAD CSV WITH HEADERS FROM uri AS row\n""")
+                neo4j.write("MATCH (source:Lot20{} {{YearBBL: row.Source}})\n".format(n))
+                neo4j.write("MATCH (target:Lot20{} {{YearBBL: row.Target}})\n".format(m))
+                neo4j.write("""MERGE (source)-[:INTERSECTION {area: toFloat(row.Area),areaA: toFloat(row.AreaA),areaB: toFloat(row.AreaB)}]->(target)\n""")
+
+                for record_row in shp_n.records():
+                    if record_row['Borough'] == borough_name:
+                        nodes_records_n.append(record_row)
+                        nodes_shapes_n.append(shp_n.shape(index))
+                        index += 1    
+                index = 0
+                print(f"Carrega vetores, {len(nodes_records_n)} {len(nodes_shapes_n)}")
+                for record_row in shp_m.records():
+                    if record_row['Borough'] == borough_name:
+                        nodes_records_m.append(record_row)
+                        nodes_shapes_m.append(shp_m.shape(index))
+                        index +=1
+                print(f"Carrega vetores aux,{len(nodes_records_m)} {len(nodes_shapes_m)}")
+
+            if(os.stat("{}{}/{}_{}_{}/nodes20{}.csv".format(n,m,borough_name,initial_block_number,final_block_number,m)).st_size == 0):
+                nodes_m_csv.write("YearBBL," + ','.join([row[0] for row in shp_m.fields][1:]) + ",Year\n")
+
+            #aqui aquele comentario la de baixo
+                      
             index = 0
             nodes_names_list = []        
             for record_row in nodes_records_n:
@@ -324,15 +362,16 @@ def relationship_maker_by_block_range_n_m(n,m, initial_block_number, final_block
                     forma_shapely = shape(nodes_shapes_n[index].__geo_interface__)
                     if "20{}{}".format(n,record_row['BBL']) not in nodes_names_list:
                         nodes_names_list.append("20{}{}".format(n,record_row['BBL']))
-                        print(record_row[0:])
-                        nodes_n_csv.write("20{}{},{},{},{},20{}\n".format(n,record_row['BBL'],record_row['Borough'],record_row['Block'],record_row['Address'],n))
+                        nodes_n_csv.write("20{}{},{},20{}\n".format(n,record_row['BBL'],','.join(str(v).replace(',',';') for v in record_row[0:]).replace(',,',',NO DATA,').replace(',,',',NO DATA,'),n))
+                        #nodes_n_csv.write("20{}{},{},{},{},20{}\n".format(n,record_row['BBL'],record_row['Borough'],record_row['Block'],record_row['Address'],n))
                         #print("2010{},{},{},{},2010".format(record_row['BBL'],record_row['Borough'],record_row['Block'],record_row['Address']))
                     index_aux = 0
                     for record_row_aux in nodes_records_m:
                         if record_row_aux['Block'] == block_number and record_row_aux['Borough'] == borough_name:
                             if "20{}{}".format(m,record_row_aux['BBL']) not in nodes_names_list:
                                 nodes_names_list.append("20{}{}".format(m,record_row_aux['BBL']))
-                                nodes_m_csv.write("20{}{},{},{},{},20{}\n".format(m,record_row_aux['BBL'],record_row_aux['Borough'],record_row_aux['Block'],record_row_aux['Address'],m))
+                                nodes_m_csv.write("20{}{},{},20{}\n".format(m,record_row_aux['BBL'],','.join(str(v).replace(',',';') for v in record_row_aux[0:]).replace(',,',',NO DATA,').replace(',,',',NO DATA,'),m))
+                                #nodes_m_csv.write("20{}{},{},{},{},20{}\n".format(m,record_row_aux['BBL'],record_row_aux['Borough'],record_row_aux['Block'],record_row_aux['Address'],m))
                                 #print("2011{},{},{},{},2011".format(record_row_aux['BBL'],record_row_aux['Borough'],record_row_aux['Block'],record_row_aux['Address']))
                             forma_shapely_aux = shape(nodes_shapes_m[index_aux].__geo_interface__)
                             if(forma_shapely.intersects(forma_shapely_aux)):
@@ -353,4 +392,22 @@ def relationship_maker_by_block_range_n_m(n,m, initial_block_number, final_block
 #relationship_maker_by_block_range_10_11(1,5000,"MN")
 #relationship_maker_by_block_range_n_m(11,12,1,5000,"MN")
 #relationship_maker_by_block_range_n_m(12, 13, 1, 5000, "MN")
-relationship_maker_by_block_range_n_m(13, 14, 1, 2, "MN")
+relationship_maker_by_block_range_n_m(13, 14, 193, 194, "MN")
+
+"""         nodes_records_n = []
+            nodes_records_m = []
+            nodes_shapes_n = []
+            nodes_shapes_m = []
+            index = 0
+            for record_row in shp_n.records():
+                if record_row['Block'] == block_number and record_row['Borough'] == borough_name:
+                    nodes_records_n.append(record_row)
+                    nodes_shapes_n.append(shp_n.shape(index))
+                index += 1    
+            index = 0
+            for record_row in shp_m.records():
+                if record_row['Block'] == block_number and record_row['Borough'] == borough_name:
+                    nodes_records_m.append(record_row)
+                    nodes_shapes_m.append(shp_m.shape(index))
+                index +=1
+"""           
